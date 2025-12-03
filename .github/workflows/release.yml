@@ -1,0 +1,79 @@
+name: Build & Release PhotoRenamer
+
+on:
+  push:
+    tags:
+      - 'v*'           # срабатывает только при теге вида v1.0, v1.1 и т.д.
+  workflow_dispatch:    # можно запустить вручную из веб-интерфейса
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            name: macOS
+            artifact: PhotoRenamer.dmg
+            jpackage-type: dmg
+          - os: windows-latest
+            name: Windows
+            artifact: PhotoRenamer-Setup.exe
+            jpackage-type: exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B clean package
+
+      - name: jpackage – create installer
+        run: |
+          jpackage \
+            --input target \
+            --name PhotoRenamer \
+            --main-jar photo-renamer-${{ github.ref_name }}.jar \
+            --main-class com.samfort.photorenamer.PhotoRenamer \
+            --app-version ${{ github.ref_name }} \
+            --vendor "Твоё имя" \
+            --type ${{ matrix.jpackage-type }} \
+            --dest output \
+            --icon src/main/resources/icon.icns \
+            --win-menu --win-shortcut \
+            --mac-package-identifier com.samfort.photorenamer
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoRenamer-${{ matrix.name }}
+          path: output/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: PhotoRenamer ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            **/*.dmg
+            **/*.exe
+            **/*.jar

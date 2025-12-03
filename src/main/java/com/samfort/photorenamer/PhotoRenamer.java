@@ -207,7 +207,7 @@ public class PhotoRenamer {
 
             if (model != null) name.append("_").append(clean(model));
             if (focal != null) name.append("_").append(clean(focal).replace(" ", ""));
-            if (fnum != null)  name.append("_").append(clean(fnum));
+            if (fnum != null)  name.append("_").append(clean(formatAperture(fnum)));
             if (shutter != null) name.append("_").append(formatShutterSpeed(clean(shutter)).replace("/", "-"));
             if (iso != null) name.append("_ISO").append(iso.trim());
 
@@ -297,6 +297,19 @@ public class PhotoRenamer {
 
     private static String clean(String s) {
         return s == null ? "" : s.replaceAll("[/\\\\:*?\"<>|]", "_").trim();
+    }
+
+    private static String formatAperture(String rawAperture) {
+        if (rawAperture == null || rawAperture.isBlank()) return EMPTY;
+
+        // Убираем всё лишнее: "f/", "F", пробелы, и заменяем запятую на точку
+        String cleaned = rawAperture.replaceAll("[^0-9.,]", "");
+
+        // Заменяем запятую на точку (немецкий/русский формат → международный)
+        cleaned = cleaned.replace(',', '.');
+
+
+            return "F" + cleaned;
     }
 
     private static String getFocalLength35mm(Metadata metadata) {
