@@ -42,11 +42,10 @@ jobs:
             --main-jar photo-renamer-${{ github.ref_name }}.jar \
             --main-class com.samfort.photorenamer.PhotoRenamer \
             --app-version ${{ github.ref_name }} \
-            --vendor "Твоё имя" \
+            --vendor "Samfort" \
             --type ${{ matrix.jpackage-type }} \
             --dest output \
             --icon src/main/resources/icon.icns \
-            --win-menu --win-shortcut \
             --mac-package-identifier com.samfort.photorenamer
 
       - name: Upload artifact
