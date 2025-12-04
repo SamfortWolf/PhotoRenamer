@@ -8,14 +8,20 @@ import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.File;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
@@ -207,7 +213,12 @@ public class PhotoRenamer {
             }
             if (date == null) return "SKIP    " + file.getFileName();
 
-            StringBuilder name = new StringBuilder(DF.format(date));
+            var photoTime = date.toInstant()
+                    .atZone(ZoneId.of("UTC"));
+
+            var prefix = photoTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+            StringBuilder name = new StringBuilder(prefix);
 
             String model = getTag(meta, ExifIFD0Directory.class, ExifIFD0Directory.TAG_MODEL);
             String focal = getFocalLength35mm(meta) != null ? getFocalLength35mm(meta) : getTag(meta, "Focal Length");
