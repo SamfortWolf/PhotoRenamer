@@ -82,6 +82,7 @@ jobs:
 
           if [ -n "$ICON_ARG" ]; then
             COMMAND+=" $ICON_ARG"
+            COMMAND+=" --resource-dir build-input"
           fi
           
           if [ -n "$CONSOLE_ARG" ]; then

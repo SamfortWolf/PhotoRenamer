@@ -98,22 +98,40 @@ public class PhotoRenamer {
             FileDialog fd = new FileDialog(frame, "Выберите папку с фотографиями", FileDialog.LOAD);
             fd.setDirectory(System.getProperty("user.home"));
 
+            // Магия для macOS
             boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
             if (isMac) {
                 System.setProperty("apple.awt.fileDialogForDirectories", "true");
             }
 
+            // КЛЮЧЕВОЙ ФИКС ДЛЯ WINDOWS:
+            // Делаем так, чтобы Windows понимал, что мы хотим выбрать именно папку
+            fd.setFilenameFilter((dir, name) -> {
+                File f = new File(dir, name);
+                return f.isDirectory();
+            });
+
             fd.setVisible(true);
 
+            // Сброс свойства macOS
             if (isMac) {
                 System.setProperty("apple.awt.fileDialogForDirectories", "false");
             }
 
-            String dir = fd.getDirectory();
+            String dir  = fd.getDirectory();
             String file = fd.getFile();
-            if (dir == null) return;
 
-            Path selected = (isMac && file != null) ? Paths.get(dir, file) : Paths.get(dir);
+            if (dir == null) return; // отмена
+
+            Path selected;
+
+            if (isMac && file != null) {
+                // macOS — собираем из двух частей
+                selected = Paths.get(dir, file);
+            } else {
+                // Windows и macOS (когда file == null) — dir уже правильный
+                selected = Paths.get(dir);
+            }
 
             if (Files.isDirectory(selected)) {
                 selectedFolder = selected.normalize();
