@@ -48,7 +48,8 @@ jobs:
           ICON_SRC="${{ matrix.config.icon }}"
           ICON_NAME=$(basename "$ICON_SRC")
           if [ -f "$ICON_SRC" ]; then
-            cp "$ICON_SRC" "build-input/$ICON_NAME"
+            cp "$ICON_SRC" "build-input/$ICON_NAME"      
+            chmod 755 "build-input/$ICON_NAME"
             echo "Icon copied → build-input/$ICON_NAME"
           fi
 
