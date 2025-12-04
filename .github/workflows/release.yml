@@ -38,7 +38,6 @@ jobs:
       - name: Build JAR
         run: mvn -B -DskipTests clean package
 
-      # ← ВСЁ В BASH, даже на Windows
       - name: Prepare input directory + icon
         shell: bash
         run: |
@@ -46,51 +45,47 @@ jobs:
           cp target/photo-renamer-*.jar build-input/
           mv build-input/photo-renamer-*.jar "build-input/photo-renamer-${{ inputs.version }}.jar"
 
-          # Копируем иконку с ПРАВИЛЬНЫМ именем в build-input (относительно input)
           ICON_SRC="${{ matrix.config.icon }}"
           ICON_NAME=$(basename "$ICON_SRC")
           if [ -f "$ICON_SRC" ]; then
             cp "$ICON_SRC" "build-input/$ICON_NAME"
             echo "Icon copied: $ICON_SRC → build-input/$ICON_NAME"
-          else
-            echo "Warning: Icon not found at $ICON_SRC"
           fi
 
-      - name: Create minimal JRE (jlink)
+      - name: Create minimal JRE (jlink) — FIXED
         shell: bash
         run: |
+          JMODS_PATH=$(find "$JAVA_HOME" -type d -name "jmods" | head -1)
+          echo "Using jmods from: $JMODS_PATH"
+
           "$JAVA_HOME/bin/jlink" \
-            --module-path "$JAVA_HOME/jmods" \
-            --add-modules java.base,java.desktop,java.logging,java.naming,java.sql,java.management,java.instrument,javafx.controls,javafx.fxml  # если JavaFX, иначе удали javafx.* \
+            --module-path "$JMODS_PATH" \
+            --add-modules java.base,java.desktop,java.logging,java.naming,java.sql,java.management,java.instrument \
             --strip-debug --no-header-files --no-man-pages \
             --compress=2 \
             --output custom-jre
 
-      - name: Build installer with icon (100% working)
+      - name: Build installer with icon
         shell: bash
         run: |
-          # Определяем правильное имя иконки для текущей ОС
           ICON_NAME=$(basename "${{ matrix.config.icon }}")
           ICON_ARG=""
           if [ -f "build-input/$ICON_NAME" ]; then
             ICON_ARG="--icon $ICON_NAME"
-            echo "Using icon: $ICON_NAME"
-          else
-            echo "No icon in build-input/$ICON_NAME — using default"
           fi
 
           "$JAVA_HOME/bin/jpackage" \
             --input build-input \
             --name PhotoRenamer \
             --main-jar "photo-renamer-${{ inputs.version }}.jar" \
-            --main-class com.grok.PhotoRenamerWithGUI \
+            --main-class com.samfort.photorenamer.PhotoRenamer \
             --runtime-image custom-jre \
             --app-version "${{ inputs.version }}" \
             --type ${{ matrix.config.type }} \
             --dest output \
             ${{ matrix.config.extra }} \
             $ICON_ARG \
-            --verbose
+            --win-console 
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
