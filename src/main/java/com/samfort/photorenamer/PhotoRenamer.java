@@ -95,49 +95,32 @@ public class PhotoRenamer {
 
         // ===== ВЫБОР ПАПКИ  =====
         chooseBtn.addActionListener(e -> {
-            FileDialog fd = new FileDialog(frame, "Выберите папку с фотографиями", FileDialog.LOAD);
-            fd.setDirectory(System.getProperty("user.home"));
+            // 1. Создаем JFileChooser
+            JFileChooser fc = new JFileChooser();
 
-            // Магия для macOS
-            boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
-            if (isMac) {
-                System.setProperty("apple.awt.fileDialogForDirectories", "true");
-            }
+            // 2. Устанавливаем режим выбора только директорий (ОЧЕНЬ ВАЖНО для кроссплатформенности)
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 
-            // КЛЮЧЕВОЙ ФИКС ДЛЯ WINDOWS:
-            // Делаем так, чтобы Windows понимал, что мы хотим выбрать именно папку
-            fd.setFilenameFilter((dir, name) -> {
-                File f = new File(dir, name);
-                return f.isDirectory();
-            });
+            // 3. Запрещаем выбор файлов
+            fc.setAcceptAllFileFilterUsed(false);
 
-            fd.setVisible(true);
+            // 4. Устанавливаем начальную директорию (опционально)
+            fc.setCurrentDirectory(new File(System.getProperty("user.home")));
 
-            // Сброс свойства macOS
-            if (isMac) {
-                System.setProperty("apple.awt.fileDialogForDirectories", "false");
-            }
+            // 5. Показываем диалог
+            int result = fc.showOpenDialog(frame);
 
-            String dir  = fd.getDirectory();
-            String file = fd.getFile();
+            // 6. Обработка результата
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fc.getSelectedFile();
+                if (selectedFile != null && selectedFile.isDirectory()) {
+                    Path selected = selectedFile.toPath().normalize();
 
-            if (dir == null) return; // отмена
-
-            Path selected;
-
-            if (isMac && file != null) {
-                // macOS — собираем из двух частей
-                selected = Paths.get(dir, file);
-            } else {
-                // Windows и macOS (когда file == null) — dir уже правильный
-                selected = Paths.get(dir);
-            }
-
-            if (Files.isDirectory(selected)) {
-                selectedFolder = selected.normalize();
-                pathField.setText(selectedFolder.toString());
-                log.setText("");
-                renameBtn.setEnabled(true);
+                    selectedFolder = selected;
+                    pathField.setText(selectedFolder.toString());
+                    log.setText("");
+                    renameBtn.setEnabled(true);
+                }
             }
         });
 
