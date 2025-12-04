@@ -2,9 +2,8 @@ name: Build & Release PhotoRenamer
 
 on:
   push:
-    tags:
-      - 'v*'           # срабатывает только при теге вида v1.0, v1.1 и т.д.
-  workflow_dispatch:    # можно запустить вручную из веб-интерфейса
+    tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,12 +13,12 @@ jobs:
         include:
           - os: macos-14
             name: macOS
-            artifact: PhotoRenamer.dmg
-            jpackage-type: dmg
+            type: dmg
+            extra: "--mac-package-identifier com.samfort.photorenamer"
           - os: windows-latest
             name: Windows
-            artifact: PhotoRenamer-Setup.exe
-            jpackage-type: exe
+            type: msi
+            extra: "--win-menu --win-shortcut --win-dir-chooser"
 
     steps:
       - uses: actions/checkout@v4
@@ -31,24 +30,32 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Build with Maven
-        run: mvn -B clean package
+      - name: Build fat JAR
+        run: mvn -B -DskipTests clean package
 
-      - name: jpackage – create installer
+      # ← Самое главное: получаем версию из pom.xml (она же в теге!)
+      - name: Get version
+        id: version
         run: |
+          echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+      - name: Build installer
+        run: |
+          JAR="photo-renamer-${{ steps.version.outputs.version }}.jar"
+          echo "Building with $JAR"
+
           jpackage \
             --input target \
             --name PhotoRenamer \
-            --main-jar photo-renamer-${{ github.ref_name }}.jar \
+            --main-jar "$JAR" \
             --main-class com.samfort.photorenamer.PhotoRenamer \
-            --app-version ${{ github.ref_name }} \
-            --vendor "Samfort" \
-            --type ${{ matrix.jpackage-type }} \
+            --app-version "${{ steps.version.outputs.version }}" \
+            --vendor "PhotoRenamer" \
+            --type ${{ matrix.type }} \
             --dest output \
-            --icon src/main/resources/icon.icns \
-            --mac-package-identifier com.samfort.photorenamer
+            ${{ matrix.extra }}
 
-      - name: Upload artifact
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: PhotoRenamer-${{ matrix.name }}
@@ -57,22 +64,12 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-
+    permissions: { contents: write }
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: PhotoRenamer ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           files: |
             **/*.dmg
+            **/*.msi
             **/*.exe
-            **/*.jar
