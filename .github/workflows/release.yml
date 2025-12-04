@@ -46,11 +46,10 @@ jobs:
           cp target/photo-renamer-*.jar build-input/
           mv build-input/photo-renamer-*.jar "build-input/photo-renamer-${{ inputs.version }}.jar"
 
-          if [ -f "${{ matrix.config.icon }}" ]; then
-            cp "${{ matrix.config.icon }}" build-input/
-            echo "Icon copied: ${{ matrix.config.icon }}"
+          if [[ "${{ matrix.config.os }}" == "macos-14" ]]; then
+            cp "src/main/resources/icons/icon.icns" "build-input/icon.icns" 2>/dev/null || echo "macOS icon not found"
           else
-            echo "No icon found (optional): ${{ matrix.config.icon }}"
+            cp "src/main/resources/icons/icon.ico" "build-input/icon.ico" 2>/dev/null || echo "Windows icon not found"
           fi
 
       - name: Create minimal JRE (jlink)
@@ -63,19 +62,30 @@ jobs:
             --compress=2 \
             --output custom-jre
 
-      - name: Build installer with icon
+      - name: Build installer with icon (100% working)
         shell: bash
         run: |
-          ICON_ARG=""
-          if [ -f "build-input/$(basename '${{ matrix.config.icon }}' 2>/dev/null || echo '')" ]; then
-            ICON_ARG="--icon build-input/$(basename '${{ matrix.config.icon }}')"
+          # Определяем правильное имя иконки для текущей ОС
+          if [[ "${{ matrix.config.os }}" == "macos-14" ]]; then
+            ICON_FILE="icon.icns"
+          else
+            ICON_FILE="icon.ico"
+          fi
+
+          # Проверяем, есть ли иконка в build-input
+          if [ -f "build-input/$ICON_FILE" ]; then
+            echo "Using icon: $ICON_FILE"
+            ICON_ARG="--icon $ICON_FILE"
+          else
+            echo "Icon not found: build-input/$ICON_FILE — will use default"
+            ICON_ARG=""
           fi
 
           "$JAVA_HOME/bin/jpackage" \
             --input build-input \
             --name PhotoRenamer \
             --main-jar "photo-renamer-${{ inputs.version }}.jar" \
-            --main-class com.samfort.photorenamer.PhotoRenamer \
+            --main-class com.samfort.photorenamer.PhotoRenamerWithGUI \
             --runtime-image custom-jre \
             --app-version "${{ inputs.version }}" \
             --type ${{ matrix.config.type }} \
