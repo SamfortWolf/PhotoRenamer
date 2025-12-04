@@ -68,23 +68,28 @@ jobs:
       - name: Build installer with icon
         shell: bash
         run: |
-          ICON_NAME=$(basename "${{ matrix.config.icon }}")
-          ICON_ARG=""
-          # Условие проверки можно убрать, так как вы уже убедились, что файл скопирован
-          # Но мы поменяем, как формируется аргумент:
-          if [ -f "build-input/$ICON_NAME" ]; then
-            # Здесь мы явно указываем относительный путь от текущей директории
-            ICON_ARG="--icon build-input/$ICON_NAME" 
-            echo "Using icon path: build-input/$ICON_NAME"
+          COMMAND="$JAVA_HOME/bin/jpackage"
+          
+          COMMAND+=" --input build-input"
+          COMMAND+=" --name PhotoRenamer"
+          COMMAND+=" --main-jar photo-renamer-${{ inputs.version }}.jar"
+          COMMAND+=" --main-class com.samfort.photorenamer.PhotoRenamer"
+          COMMAND+=" --runtime-image custom-jre"
+          COMMAND+=" --app-version ${{ inputs.version }}"
+          COMMAND+=" --type ${{ matrix.config.type }}"
+          COMMAND+=" --dest output"
+          COMMAND+=" ${{ matrix.config.extra }}"
+
+          if [ -n "$ICON_ARG" ]; then
+            COMMAND+=" $ICON_ARG"
           fi
-          # ... (остальной скрипт без изменений)
-          "$JAVA_HOME/bin/jpackage" \
-            --input build-input \
-            # ...
-            --dest output \
-            ${{ matrix.config.extra }} \
-            $ICON_ARG
-      #            $CONSOLE_ARG
+          
+          if [ -n "$CONSOLE_ARG" ]; then
+            COMMAND+=" $CONSOLE_ARG"
+          fi
+
+          # Выполняем команду
+          $COMMAND
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
