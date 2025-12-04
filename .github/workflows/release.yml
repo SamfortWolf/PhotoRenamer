@@ -10,20 +10,20 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.config.os }}  # ← явно из matrix.config.os
     strategy:
       matrix:
         config:
           - os: macos-14
             name: macOS
             type: dmg
-            icon: src/main/resources/icons/icon.icns
             extra: "--mac-package-identifier com.samfort.photorenamer"
+            icon: "src/main/resources/icons/icon.icns"
           - os: windows-latest
             name: Windows
             type: msi
-            icon: src/main/resources/icons/icon.ico
             extra: "--win-menu --win-shortcut --win-dir-chooser"
+            icon: "src/main/resources/icons/icon.ico"
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
             cp "${{ matrix.config.icon }}" build-input/
             echo "Icon copied: ${{ matrix.config.icon }}"
           else
-            echo "Icon not found: ${{ matrix.config.icon }}"
+            echo "No icon: ${{ matrix.config.icon }}"
           fi
 
       - name: Create minimal JRE (jlink)
@@ -62,8 +62,9 @@ jobs:
       - name: Build installer with icon
         run: |
           ICON_ARG=""
-          if [ -f "build-input/$(basename ${{ matrix.config.icon }})" ]; then
-            ICON_ARG="--icon build-input/$(basename ${{ matrix.config.icon }})"
+          ICON_NAME=$(basename "${{ matrix.config.icon }}")
+          if [ -f "build-input/$ICON_NAME" ]; then
+            ICON_ARG="--icon build-input/$ICON_NAME"
           fi
 
           jpackage \
@@ -73,6 +74,7 @@ jobs:
             --main-class com.samfort.photorenamer.PhotoRenamer \
             --runtime-image custom-jre \
             --app-version "${{ inputs.version }}" \
+            --vendor "PhotoRenamer" \
             --type ${{ matrix.config.type }} \
             --dest output \
             ${{ matrix.config.extra }} \
@@ -83,3 +85,18 @@ jobs:
         with:
           name: PhotoRenamer-${{ matrix.config.name }}-v${{ inputs.version }}
           path: output/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: PhotoRenamer ${{ inputs.version }}
+          files: |
+            **/*.dmg
+            **/*.msi
