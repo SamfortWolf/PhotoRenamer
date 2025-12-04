@@ -1,9 +1,16 @@
-name: Build & Release PhotoRenamer
+name: Build PhotoRenamer
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Номер версии (например: 1.5.2)'
+        required: true
+        default: '1.0.0'
+      prerelease:
+        description: 'Это пре-релиз?'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -18,7 +25,7 @@ jobs:
           - os: windows-latest
             name: Windows
             type: msi
-            extra: "--win-menu --win-shortcut --win-dir-chooser"
+            extra: "--win-menu --win-shortcut"
 
     steps:
       - uses: actions/checkout@v4
@@ -30,26 +37,25 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Build fat JAR
+      - name: Build JAR
         run: mvn -B -DskipTests clean package
 
-      # ← Самое главное: получаем версию из pom.xml (она же в теге!)
-      - name: Get version
-        id: version
-        run: |
-          echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
-
+      # ← БЕРЁМ ВЕРСИЮ ИЗ ВВОДА, А НЕ ИЗ POM!
       - name: Build installer
+        shell: bash
         run: |
-          JAR="photo-renamer-${{ steps.version.outputs.version }}.jar"
-          echo "Building with $JAR"
+          VERSION="${{ inputs.version }}"
+          JAR="photo-renamer-$VERSION.jar"
+
+          # Временно переименовываем JAR под нужную версию
+          cp target/photo-renamer-*.jar "target/$JAR"
 
           jpackage \
             --input target \
             --name PhotoRenamer \
             --main-jar "$JAR" \
             --main-class com.samfort.photorenamer.PhotoRenamer \
-            --app-version "${{ steps.version.outputs.version }}" \
+            --app-version "$VERSION" \
             --vendor "PhotoRenamer" \
             --type ${{ matrix.type }} \
             --dest output \
@@ -58,18 +64,5 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: PhotoRenamer-${{ matrix.name }}
+          name: PhotoRenamer-${{ matrix.name }}-v${{ inputs.version }}${{ inputs.prerelease && '-beta' || '' }}
           path: output/*
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions: { contents: write }
-    steps:
-      - uses: actions/download-artifact@v4
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            **/*.dmg
-            **/*.msi
-            **/*.exe
