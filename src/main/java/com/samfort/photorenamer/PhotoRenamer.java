@@ -32,18 +32,14 @@ public class PhotoRenamer {
         try {
             // Фикс для macOS 15+/26: headless mode, sandbox, entitlements
             System.setProperty("java.awt.headless", "false");
-            System.setProperty("apple.awt.UIElement", "false");  // ← false, чтобы Dock-иконка была и не краш
-            System.setProperty("com.apple.security.app-sandbox.enabled", "false");  // отключаем sandbox для теста
+            System.setProperty("apple.awt.UIElement", "false");
+            System.setProperty("com.apple.security.app-sandbox.enabled", "false");
 
             // Включаем нативное поведение меню (About, Quit и т.д.) на macOS
             System.setProperty("apple.laf.useScreenMenuBar", "true");
             System.setProperty("com.apple.mrj.application.apple.menu.about.name",
                     "com.samfort.photorenamer.PhotoRenamer");
             System.setProperty("apple.awt.fileDialogForDirectories", "true");
-
-            // Логирование для отладки (удали потом)
-            System.setProperty("java.util.logging.config.file", "logging.properties");  // если есть файл, или просто:
-            System.out.println("App starting...");  // добавь в createGUI() для теста
         } catch (Exception ignored) {
         }
 
@@ -97,20 +93,33 @@ public class PhotoRenamer {
         frame.setContentPane(panel);
         frame.setVisible(true);
 
-        // ===== ВЫБОР ПАПКИ — ИСПРАВЛЕННЫЙ FileDialog =====
+        // ===== ВЫБОР ПАПКИ  =====
         chooseBtn.addActionListener(e -> {
             FileDialog fd = new FileDialog(frame, "Выберите папку с фотографиями", FileDialog.LOAD);
             fd.setDirectory(System.getProperty("user.home"));
+
+            boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
+            if (isMac) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "true");
+            }
+
             fd.setVisible(true);
 
-            String dir = fd.getDirectory();
-            String file = fd.getFile();  // ← это и есть название выбранной папки!
+            if (isMac) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "false");
+            }
 
-            if (dir != null && file != null) {
-                selectedFolder = Path.of(dir, file);
+            String dir = fd.getDirectory();
+            String file = fd.getFile();
+            if (dir == null) return;
+
+            Path selected = (isMac && file != null) ? Paths.get(dir, file) : Paths.get(dir);
+
+            if (Files.isDirectory(selected)) {
+                selectedFolder = selected.normalize();
                 pathField.setText(selectedFolder.toString());
                 log.setText("");
-                renameBtn.setEnabled(false);
+                renameBtn.setEnabled(true);
             }
         });
 

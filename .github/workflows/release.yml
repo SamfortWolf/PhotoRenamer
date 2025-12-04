@@ -92,7 +92,7 @@ jobs:
             --dest output \
             ${{ matrix.config.extra }} \
             $ICON_ARG \
-            $CONSOLE_ARG
+#            $CONSOLE_ARG
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
