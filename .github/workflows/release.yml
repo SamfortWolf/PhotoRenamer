@@ -4,28 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Номер версии (например: 1.5.2)'
+        description: 'Version (e.g. 1.5.2)'
         required: true
         default: '1.0.0'
-      prerelease:
-        description: 'Это пре-релиз?'
-        type: boolean
-        default: false
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
+        config:
           - os: macos-14
             name: macOS
             type: dmg
+            icon: src/main/resources/icons/icon.icns
             extra: "--mac-package-identifier com.samfort.photorenamer"
           - os: windows-latest
             name: Windows
             type: msi
-            extra: "--win-menu --win-shortcut"
+            icon: src/main/resources/icons/icon.ico
+            extra: "--win-menu --win-shortcut --win-dir-chooser"
 
     steps:
       - uses: actions/checkout@v4
@@ -40,29 +38,48 @@ jobs:
       - name: Build JAR
         run: mvn -B -DskipTests clean package
 
-      # ← БЕРЁМ ВЕРСИЮ ИЗ ВВОДА, А НЕ ИЗ POM!
-      - name: Build installer
-        shell: bash
+      - name: Prepare input directory with JAR + icon
         run: |
-          VERSION="${{ inputs.version }}"
-          JAR="photo-renamer-$VERSION.jar"
+          mkdir -p build-input
+          cp target/photo-renamer-*.jar build-input/
+          mv build-input/photo-renamer-*.jar "build-input/photo-renamer-${{ inputs.version }}.jar"
+          if [ -f "${{ matrix.config.icon }}" ]; then
+            cp "${{ matrix.config.icon }}" build-input/
+            echo "Icon copied: ${{ matrix.config.icon }}"
+          else
+            echo "Icon not found: ${{ matrix.config.icon }}"
+          fi
 
-          # Временно переименовываем JAR под нужную версию
-          cp target/photo-renamer-*.jar "target/$JAR"
+      - name: Create minimal JRE (jlink)
+        run: |
+          $JAVA_HOME/bin/jlink \
+            --module-path $JAVA_HOME/jmods \
+            --add-modules java.base,java.desktop,java.logging,java.naming,java.sql,java.management,java.instrument \
+            --strip-debug --no-header-files --no-man-pages \
+            --compress=2 \
+            --output custom-jre
+
+      - name: Build installer with icon
+        run: |
+          ICON_ARG=""
+          if [ -f "build-input/$(basename ${{ matrix.config.icon }})" ]; then
+            ICON_ARG="--icon build-input/$(basename ${{ matrix.config.icon }})"
+          fi
 
           jpackage \
-            --input target \
+            --input build-input \
             --name PhotoRenamer \
-            --main-jar "$JAR" \
+            --main-jar "photo-renamer-${{ inputs.version }}.jar" \
             --main-class com.samfort.photorenamer.PhotoRenamer \
-            --app-version "$VERSION" \
-            --vendor "PhotoRenamer" \
-            --type ${{ matrix.type }} \
+            --runtime-image custom-jre \
+            --app-version "${{ inputs.version }}" \
+            --type ${{ matrix.config.type }} \
             --dest output \
-            ${{ matrix.extra }}
+            ${{ matrix.config.extra }} \
+            $ICON_ARG
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: PhotoRenamer-${{ matrix.name }}-v${{ inputs.version }}${{ inputs.prerelease && '-beta' || '' }}
+          name: PhotoRenamer-${{ matrix.config.name }}-v${{ inputs.version }}
           path: output/*
