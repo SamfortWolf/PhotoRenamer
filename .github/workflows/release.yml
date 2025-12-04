@@ -10,20 +10,20 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.config.os }}  # ← явно из matrix.config.os
+    runs-on: ${{ matrix.config.os }}
     strategy:
       matrix:
         config:
           - os: macos-14
             name: macOS
             type: dmg
+            icon: src/main/resources/icons/icon.icns
             extra: "--mac-package-identifier com.samfort.photorenamer"
-            icon: "src/main/resources/icons/icon.icns"
           - os: windows-latest
             name: Windows
             type: msi
+            icon: src/main/resources/icons/icon.ico
             extra: "--win-menu --win-shortcut --win-dir-chooser"
-            icon: "src/main/resources/icons/icon.ico"
 
     steps:
       - uses: actions/checkout@v4
@@ -38,43 +38,46 @@ jobs:
       - name: Build JAR
         run: mvn -B -DskipTests clean package
 
-      - name: Prepare input directory with JAR + icon
+      # ← ВСЁ В BASH, даже на Windows
+      - name: Prepare input directory + icon
+        shell: bash
         run: |
           mkdir -p build-input
           cp target/photo-renamer-*.jar build-input/
           mv build-input/photo-renamer-*.jar "build-input/photo-renamer-${{ inputs.version }}.jar"
+
           if [ -f "${{ matrix.config.icon }}" ]; then
             cp "${{ matrix.config.icon }}" build-input/
             echo "Icon copied: ${{ matrix.config.icon }}"
           else
-            echo "No icon: ${{ matrix.config.icon }}"
+            echo "No icon found (optional): ${{ matrix.config.icon }}"
           fi
 
       - name: Create minimal JRE (jlink)
+        shell: bash
         run: |
-          $JAVA_HOME/bin/jlink \
-            --module-path $JAVA_HOME/jmods \
+          "$JAVA_HOME/bin/jlink" \
+            --module-path "$JAVA_HOME/jmods" \
             --add-modules java.base,java.desktop,java.logging,java.naming,java.sql,java.management,java.instrument \
             --strip-debug --no-header-files --no-man-pages \
             --compress=2 \
             --output custom-jre
 
       - name: Build installer with icon
+        shell: bash
         run: |
           ICON_ARG=""
-          ICON_NAME=$(basename "${{ matrix.config.icon }}")
-          if [ -f "build-input/$ICON_NAME" ]; then
-            ICON_ARG="--icon build-input/$ICON_NAME"
+          if [ -f "build-input/$(basename '${{ matrix.config.icon }}' 2>/dev/null || echo '')" ]; then
+            ICON_ARG="--icon build-input/$(basename '${{ matrix.config.icon }}')"
           fi
 
-          jpackage \
+          "$JAVA_HOME/bin/jpackage" \
             --input build-input \
             --name PhotoRenamer \
             --main-jar "photo-renamer-${{ inputs.version }}.jar" \
             --main-class com.samfort.photorenamer.PhotoRenamer \
             --runtime-image custom-jre \
             --app-version "${{ inputs.version }}" \
-            --vendor "PhotoRenamer" \
             --type ${{ matrix.config.type }} \
             --dest output \
             ${{ matrix.config.extra }} \
@@ -85,18 +88,3 @@ jobs:
         with:
           name: PhotoRenamer-${{ matrix.config.name }}-v${{ inputs.version }}
           path: output/*
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          name: PhotoRenamer ${{ inputs.version }}
-          files: |
-            **/*.dmg
-            **/*.msi
