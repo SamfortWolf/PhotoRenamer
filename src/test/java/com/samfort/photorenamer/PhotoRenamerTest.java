@@ -1,13 +1,9 @@
 package com.samfort.photorenamer;
 
-import com.drew.imaging.ImageMetadataReader;
-import com.drew.metadata.Metadata;
-import com.drew.metadata.exif.ExifSubIFDDirectory;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Date;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PhotoRenamerTest {
 
-    private final PhotoRenamer photoRenamer = new PhotoRenamer();
+    private final FileRenameService fileRenameService = new FileRenameService();
 
     private final String testFileName = "IMG20251023104114_res.jpg";
 
@@ -29,16 +25,18 @@ class PhotoRenamerTest {
         assertThat(testFile).isNotNull();
 
         var expectedName = "20251023_104114_OPPO Find X9 Pro_140_mm_F2.1_1-364_ISO50.jpg";
-        var expectedOutputDry = "→       " + testFileName + " → " + expectedName;
 
         // Тестируем метод без перезаписи
-        var result = PhotoRenamer.processFile(testFile, true);
-        assertThat(result).isEqualTo(expectedOutputDry);
+        var result = fileRenameService.processFile(testFile, true);
+        assertThat(result)
+                .extracting(RenameResult::getStatus, RenameResult::getNewName)
+                .containsExactlyInAnyOrder(RenameResult.Status.SUCCESS, expectedName);
 
         // Теперь запускаем с перезаписью
-        var expectedOutput = "RENAMED " + testFileName + " → " + expectedName;
-        result = PhotoRenamer.processFile(testFile, false);
-        assertThat(result).isEqualTo(expectedOutput);
+        result = fileRenameService.processFile(testFile, false);
+        assertThat(result)
+                .extracting(RenameResult::getStatus, RenameResult::getNewName)
+                .containsExactlyInAnyOrder(RenameResult.Status.SUCCESS, expectedName);
 
         // Проверяем, что файл был переименован
         var renamedFile = testFile.getParent().resolve(expectedName);
