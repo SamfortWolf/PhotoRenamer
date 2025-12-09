@@ -41,46 +41,35 @@ jobs:
         shell: bash
         run: |
           mkdir -p build-input
+          # Используем более надежный поиск JAR
           cp target/photo-renamer-*.jar build-input/
           mv build-input/photo-renamer-*.jar "build-input/photo-renamer-${{ inputs.version }}.jar"
 
-      # Шаг 2: Подготовка ресурсов и иконки в правильной структуре
+      # Шаг 2: Подготовка ресурсов и иконки (Копируем в корень для явного использования)
       - name: Prepare jpackage resources and icon structure
         shell: bash
         run: |
           ICON_SRC_MAC="src/main/resources/icons/icon.icns"
           ICON_SRC_WIN="src/main/resources/icons/icon.ico"
           
-          # Для macOS: иконка должна быть в Contents/Resources/
-          if [[ "${{ matrix.config.os }}" == "macos-14" ]]; then
-            mkdir -p Contents/Resources
-            if [ -f "$ICON_SRC_MAC" ]; then
-              cp "$ICON_SRC_MAC" "Contents/Resources/icon.icns"
-              chmod 755 "Contents/Resources/icon.icns"
-              echo "Mac icon prepared at Contents/Resources/icon.icns"
-            else
-              echo "ERROR: Mac icon file not found at $ICON_SRC_MAC"
-            fi
+          # Копируем иконки в корень репозитория (CWD) для явного использования через --icon
+          if [ -f "$ICON_SRC_MAC" ]; then
+            cp "$ICON_SRC_MAC" "icon.icns" 
+            chmod 755 "icon.icns"
+            echo "Mac icon prepared at icon.icns"
+          fi
           
-          # Для Windows: иконка должна быть в корне ресурсной директории
-          elif [[ "${{ matrix.config.os }}" == "windows-latest" ]]; then
-            if [ -f "$ICON_SRC_WIN" ]; then
-              cp "$ICON_SRC_WIN" "icon.ico"
-              chmod 755 "icon.ico"
-              echo "Windows icon prepared at icon.ico"
-            else
-              echo "ERROR: Windows icon file not found at $ICON_SRC_WIN"
-            fi
+          if [ -f "$ICON_SRC_WIN" ]; then
+            cp "$ICON_SRC_WIN" "icon.ico"
+            chmod 755 "icon.ico"
+            echo "Windows icon prepared at icon.ico"
           fi
 
       - name: Create minimal JRE (jlink)
         shell: bash
         run: |
-          JMODS_PATH=$(find "$JAVA_HOME" -type d -name "jmods" | head -1)
-          echo "jmods found at: $JMODS_PATH"
-
+          # ФИКС JLINK: Убираем --module-path, чтобы jlink использовал JRT-FS.
           "$JAVA_HOME/bin/jlink" \
-            --module-path "$JMODS_PATH" \
             --add-modules java.base,java.desktop,java.logging,java.naming,java.sql,java.management,java.instrument \
             --strip-debug --no-header-files --no-man-pages \
             --compress=2 \
@@ -89,10 +78,23 @@ jobs:
       - name: Build installer
         shell: bash
         run: |
-          # win-console только для Windows
+          # 1. win-console только для Windows
           CONSOLE_ARG=""
           if [[ "${{ matrix.config.os }}" == "windows-latest" ]]; then
             CONSOLE_ARG="--win-console"
+          fi
+          
+          # 2. Определяем имя иконки и формируем аргумент --icon
+          ICON_FILE=""
+          if [[ "${{ matrix.config.os }}" == "macos-14" ]]; then
+            ICON_FILE="icon.icns"
+          elif [[ "${{ matrix.config.os }}" == "windows-latest" ]]; then
+            ICON_FILE="icon.ico"
+          fi
+          
+          ICON_ARG=""
+          if [ -n "$ICON_FILE" ] && [ -f "$ICON_FILE" ]; then
+            ICON_ARG="--icon $ICON_FILE"
           fi
 
           COMMAND="$JAVA_HOME/bin/jpackage"
@@ -108,6 +110,7 @@ jobs:
           COMMAND+=" ${{ matrix.config.extra }}"
 
           COMMAND+=" --resource-dir ."
+          COMMAND+=" $ICON_ARG"
           COMMAND+=" $CONSOLE_ARG"
 
           # Выполняем команду
