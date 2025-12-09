@@ -9,14 +9,5 @@ target/
 *.iml
 test.http
 t
-*.patch
-scripts/bash/*.zip
-scripts/bash/fix_edo
-scripts/bash/fix_ero
-scripts/bash/fix_ero_end_date
-scripts/bash/fix_ero_source
-scripts/bash/fix_phones
-scripts/bash/fix_phones_ext
-scripts/bash/fix_ek4
-scripts/bash/*.sql
+
 

@@ -200,7 +200,7 @@ public class PhotoRenamer {
         }
     }
 
-    private static String processFile(Path file, boolean dryRun) {
+    static String processFile(Path file, boolean dryRun) {
         try {
             Metadata meta = ImageMetadataReader.readMetadata(file.toFile());
 
